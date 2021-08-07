@@ -1,38 +1,45 @@
+/*
+ * Session.scala
+ * (Neovim UI Test)
+ *
+ * Copyright (c) 2021 Hanns Holger Rutz. All rights reserved.
+ *
+ * This software is published under the GNU Lesser General Public License v2.1+
+ *
+ *
+ * For further information, please contact Hanns Holger Rutz at
+ * contact@sciss.de
+ */
+
 package de.sciss.nvim
 
+import de.sciss.model.Model
+import de.sciss.model.impl.ModelImpl
 import wvlet.airframe.msgpack.spi.{MessagePack, Value}
 import wvlet.airframe.msgpack.spi.Value.StringValue
 
 import java.io.{InputStream, OutputStream}
 import scala.annotation.switch
 import scala.collection.mutable
+import scala.concurrent.duration.Duration
 import scala.concurrent.{Future, Promise}
 import scala.util.control.NonFatal
-
-object PacketType {
-  final val Request       = 0
-  final val Response      = 1
-  final val Notification  = 2
-}
-
-// Provided by the user on session start to register any msgpack extended types
-case class ExtendedType[A <: AnyRef](typeClass: Class[A], typeId: Byte,
-                                     serializer: A => Array[Byte],
-                                     deserializer: Array[Byte] => A)
 
 object Session {
   def apply(in: InputStream, out: OutputStream): Session =
     new Impl(in, out)
 
   private final class Impl(in: InputStream, out: OutputStream)
-    extends Session {
+    extends Session with ModelImpl[Packet] {
 
-    private[this] var nextReqId = 1
-    private[this] val reqMap    = mutable.Map.empty[Int, Req[_]]
+    private final val DEBUG = false
+
+    private[this] var nextReqId   = 1
+    private[this] val handlerMap  = mutable.Map.empty[Int, Handler[_]]
 
     private[this] val sync = new AnyRef
 
-    private final class Req[A](/*val id: Int,*/ pr: Promise[A], peer: Request[A]) {
+    private final class Handler[A](pr: Promise[A], peer: Request[A]) {
       def complete(v: Value): Unit =
         try {
           val resT = peer.decode(v)
@@ -56,48 +63,55 @@ object Session {
             val sz  = u.unpackArrayHeader
             val tpe = u.unpackInt
             (tpe: @switch) match {
-              case PacketType.Request =>
+              case Packet.RequestType =>
                 // [type, msgid, method, params]
                 require (sz == 4)
                 val msgId   = u.unpackInt
                 val method  = u.unpackString
-                val args    = u.unpackValue
-                println(s"Request: $msgId, $method, $args")
+                val params  = u.unpackValue
+                if (DEBUG) println(s"Request: $msgId, $method, $params")
 
-              case PacketType.Response =>
+              case Packet.ResponseType =>
                 // [type, msgid, error, result]
                 require (sz == 4)
                 val msgId = u.unpackInt
                 val ok    = u.tryUnpackNil
                 sync.synchronized {
-                  reqMap.remove(msgId) match {
+                  handlerMap.remove(msgId) match {
                     case Some(req) =>
                       if (ok) {
-                        val res = u.unpackValue
-                        println(s"Response: $msgId, success - $res")
-                        req.complete(res)
+                        val result = u.unpackValue
+                        if (DEBUG) println(s"Response: $msgId, success - $result")
+                        req.complete(result)
 
                       } else {
                         val errV  = u.unpackValue
-                        val err   = errV match {
+                        val error = errV match {
                           case StringValue(s) => s
                           case other          => other.toString
                         }
                         /*val res   =*/ u.unpackValue
-                        println(s"Response: $msgId, failure - $err")
-                        req.fail(err)
+                        if (DEBUG) println(s"Response: $msgId, failure - $error")
+                        req.fail(error)
                       }
                     case None =>
                       println(s"Ooops. No handler for request $msgId")
                   }
                 }
 
-              case PacketType.Notification =>
+              case Packet.NotificationType =>
                 // [type, method, params]
                 require (sz == 3)
                 val method  = u.unpackString
-                val args    = u.unpackValue
-                println(s"Notification: $method, $args")
+                val params  = u.unpackValue
+                if (DEBUG) println(s"Notification: $method, $params")
+                Notification.get(method) match {
+                  case Some(nf) =>
+                    val n = nf.decode(params)
+                    dispatch(n)
+
+                  case None =>
+                }
             }
           } catch {
             case NonFatal(e) =>
@@ -108,18 +122,19 @@ object Session {
       start()
     }
 
-    override def request[A](req: Request[A]): Future[A] =
+    // XXX TODO: timeout
+    override def !![A](req: Request[A], timeout: Duration): Future[A] =
       sync.synchronized {
         val id = nextReqId
         nextReqId += 1
 
         val pr = Promise[A]()
-        val rq = new Req(pr, req)
-        assert (reqMap.put(id, rq).isEmpty)
+        val rq = new Handler(pr, req)
+        assert (handlerMap.put(id, rq).isEmpty)
 
         val p = MessagePack.newBufferPacker
         p.packArrayHeader(4)
-        p.packInt(PacketType.Request)
+        p.packInt(Packet.RequestType)
         p.packInt(id)
         p.packString(req.method)
         p.packValue(req.params)
@@ -129,12 +144,12 @@ object Session {
         pr.future
       }
 
-    override def notify(n: Notification): Unit =
+    override def !(n: Notification): Unit =
       sync.synchronized {
 //      val p = MessagePack.newPacker(out) -- N.B. seems broken
         val p = MessagePack.newBufferPacker
         p.packArrayHeader(3)
-        p.packInt(PacketType.Notification)
+        p.packInt(Packet.NotificationType)
         p.packString(n.method)
         p.packValue(n.params)
         out.write(p.toByteArray)
@@ -142,8 +157,8 @@ object Session {
       }
   }
 }
-trait Session {
-  def notify(n: Notification): Unit
+trait Session extends Model[Packet] {
+  def ! (n: Notification): Unit
 
-  def request[A](req: Request[A]): Future[A]
+  def !! [A](req: Request[A], timeout: Duration): Future[A]
 }

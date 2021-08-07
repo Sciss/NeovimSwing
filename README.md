@@ -10,9 +10,19 @@ by Hanns Holger Rutz. All rights reserved. ScalaOSC is released under
 the [GNU Lesser General Public License](https://github.com/Sciss/NeovimUITest/raw/main/LICENSE) v2.1+ and comes with
 absolutely no warranties. To contact the author, send an e-mail to `contact at sciss.de`.
 
+![screenshot](screenshot.png)
+
+## status
+
+In 'alpha' state. Redraw working, but no keyboard interaction yet.
+
 ## requirements / installation
 
 This project builds with sbt against Scala 2.13.
+
+## running
+
+Use `sbt run`. It assumes the `nvim` executable is on the `PATH`. Neovim 0.5.0 or higher is required.
 
 ## setting up nvim
 
@@ -43,9 +53,9 @@ msgpack libraries for Scala:
 - [msgpack4z](https://github.com/msgpack4z/msgpack4z-core) - active project, sadly based on ScalaZ
 - [airframe](https://github.com/wvlet/airframe) - seems to include msgpack support, but only low level?
   see also https://wvlet.org/airframe/docs/airframe-rpc.html -- looks like a good solution if we generate
-  the serializers somehow
+  the serializers somehow. **Trying to use this one**.
 - [scodec-msgpack](https://github.com/xuwei-k/scodec-msgpack) - based on scodec with shapeless as additional 
-   dependency; seems up-to-date. **Trying to use this one**. Note: needs shapeless because it uses
+   dependency; seems up-to-date. Note: needs shapeless because it uses
    scodec 1.x instead of 2.x !
 - [msgpack4s](https://github.com/velvia/msgpack4s) - unclear if still maintained
   
