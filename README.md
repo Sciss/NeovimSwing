@@ -42,8 +42,11 @@ msgpack libraries for Scala:
 
 - [msgpack4z](https://github.com/msgpack4z/msgpack4z-core) - active project, sadly based on ScalaZ
 - [airframe](https://github.com/wvlet/airframe) - seems to include msgpack support, but only low level?
+  see also https://wvlet.org/airframe/docs/airframe-rpc.html -- looks like a good solution if we generate
+  the serializers somehow
 - [scodec-msgpack](https://github.com/xuwei-k/scodec-msgpack) - based on scodec with shapeless as additional 
-   dependency; seems up-to-date. **Trying to use this one**.
+   dependency; seems up-to-date. **Trying to use this one**. Note: needs shapeless because it uses
+   scodec 1.x instead of 2.x !
 - [msgpack4s](https://github.com/velvia/msgpack4s) - unclear if still maintained
   
 Scala projects communicating with nvim:

@@ -5,6 +5,6 @@ lazy val root = project.in(file("."))
       // "com.github.xuwei-k" %% "msgpack4z-core" % "0.5.2", // needs scalaz
       // "org.velvia" %% "msgpack4s" % "0.6.0", // currently unavailable
       "com.github.xuwei-k" %% "scodec-msgpack" % "0.8.0", // needs scodec and shapeless
-      // "org.wvlet.airframe" %% "airframe-msgpack" % "21.7.0",
+       "org.wvlet.airframe" %% "airframe-msgpack" % "21.8.0",
     )
   )

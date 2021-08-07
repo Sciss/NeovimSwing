@@ -1,7 +1,9 @@
 package de.sciss.nvim
 
 import java.io.{InputStream, OutputStream}
+import scala.concurrent.ExecutionContext.Implicits._
 import scala.sys.process.{Process, ProcessIO}
+import scala.util.{Failure, Success}
 
 object NivmTest {
   def main(args: Array[String]): Unit = run()
@@ -20,9 +22,16 @@ object NivmTest {
 
     val n = Neovim(is, os)
 
-    Thread.sleep(8000)
+//    Thread.sleep(8000)
+    val expr = "12 + 34"
+    n.eval(expr).onComplete {
+      case Success(s) =>
+        println(s"nvim says $expr equals $s")
+        n.quit()
 
-    n.quit()
+      case Failure(e) =>
+        e.printStackTrace()
+    }
 
     val res = p.exitValue()
     println(s"nivm exited with code $res")

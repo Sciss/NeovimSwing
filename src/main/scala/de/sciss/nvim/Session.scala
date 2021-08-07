@@ -1,45 +1,18 @@
-// originally based on https://github.com/fuyumatsuri/msgpack-rpc-scala/
-// (BSD licensed)
-
 package de.sciss.nvim
 
-import java.io.{InputStream, OutputStream}
+import wvlet.airframe.msgpack.spi.{MessagePack, Value}
+import wvlet.airframe.msgpack.spi.Value.StringValue
 
+import java.io.{InputStream, OutputStream}
+import scala.annotation.switch
 import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
-import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 object PacketType {
   final val Request       = 0
   final val Response      = 1
   final val Notification  = 2
-}
-
-abstract sealed class Packet
-
-case class Request(packetType: Int, requestId: Long, method: String, args: List[Any]) extends Packet
-object Request {
-  def apply(requestId: Long, method: String, args: List[Any]) =
-    new Request(PacketType.Request, requestId, method, args)
-}
-
-case class Response(packetType: Int, requestId: Long, error: Any, result: Any) extends Packet
-object Response {
-  def apply(requestId: Long, error: Any, result: Any) = new Response(PacketType.Response, requestId, error, result)
-}
-
-case class Notification(packetType: Int, method: String, args: List[Any]) extends Packet
-object Notification{
-  def apply(method: String, args: List[Any]) = new Notification(PacketType.Notification, method, args)
-}
-
-// An instance of ResponseHandler is given to the user when a request is received
-// to allow the user to provide a response
-case class ResponseHandler(writer: (Object) => Unit, requestId: Long) {
-  def send(resp: Any*): Unit = send(resp.toList)
-  def send(resp: List[Any]): Unit = {
-    writer(Response(requestId, null, resp))
-  }
 }
 
 // Provided by the user on session start to register any msgpack extended types
@@ -48,100 +21,134 @@ case class ExtendedType[A <: AnyRef](typeClass: Class[A], typeId: Byte,
                                      deserializer: Array[Byte] => A)
 
 object Session {
-  def apply(in: InputStream, out: OutputStream, types: List[ExtendedType[_ <: AnyRef]] = List()): Session =
-    new Impl(in, out, types)
+  def apply(in: InputStream, out: OutputStream): Session =
+    new Impl(in, out)
 
-  private final class Impl(in: InputStream, out: OutputStream, types: List[ExtendedType[_ <: AnyRef]])
+  private final class Impl(in: InputStream, out: OutputStream)
     extends Session {
 
-//    private val msgpack = new Msgpack(types)
+    private[this] var nextReqId = 1
+    private[this] val reqMap    = mutable.Map.empty[Int, Req[_]]
 
-    private var nextRequestId: Long = 1
-    private val pendingRequests = mutable.Map.empty[Long, (ClassTag[_], Promise[Any])]
+    private[this] val sync = new AnyRef
 
-    private case class RequestEvent(method: String, args: List[Any], resp: ResponseHandler)
-//    private val requestEvent = ReplaySubject[RequestEvent]
-
-    private case class NotificationEvent(method: String, args: List[Any])
-//    private val notificationEvent = ReplaySubject[NotificationEvent]
-
-//    // Create a thread to listen for any packets
-//    new Thread(new Runnable {
-//      override def run(): Unit = {
-//        try {
-//          while (true) {
-//            val packet = msgpack.readPacket(in)
-//            parseMessage(packet)
-//          }
-//        } catch {
-//          case e: JsonMappingException => // end-of-input
-//        }
-//      }
-//    }).start()
-
-//    def onRequest(callback: (String, List[Any], ResponseHandler) => Unit) =
-//      requestEvent.subscribe( next => callback(next.method, next.args, next.resp) )
-//
-//    def onNotification(callback: (String, List[Any]) => Unit) =
-//      notificationEvent.subscribe( next => callback(next.method, next.args) )
-
-    trait DefaultsTo[Type, Default]
-    object DefaultsTo {
-      implicit def defaultDefaultsTo[T]: DefaultsTo[T, T] = null
-      implicit def fallback[T, D]: DefaultsTo[T, D] = null
-    }
-
-//    def request[A <: Any : ClassTag](method: String, args: List[Any] = List())
-//                                    (implicit default: A DefaultsTo Any): Future[A] = {
-//      val ct = implicitly[ClassTag[A]]
-//
-//      val p = Promise[A]()
-//
-//      synchronized {
-//        val id: Long = this.nextRequestId
-//        this.nextRequestId += 1
-//
-//        this.pendingRequests += (id -> (ct, p.asInstanceOf[Promise[Any]]))
-//        write(Request(id, method, args))
-//      }
-//
-//      p.future
-//    }
-
-    override def notify(api: API): Unit = {
-      // write(Notification(method, args))
-      val bv = api.encode.getOrElse(sys.error("Could not encode packet"))
-      out.write(bv.toByteArray)
-      out.flush()
-    }
-
-//    private def write(obj: Object): Unit = {
-//      msgpack.write(obj, out)
-//    }
-
-    private def parseMessage(packet: Packet) = packet match {
-      case Request(_, id, method, args) =>
-        ??? // this.requestEvent.onNext(RequestEvent(method, args, ResponseHandler(this.write, id)))
-
-      case Response(_, id, err, result) =>
-        synchronized {
-          this.pendingRequests(id) match {
-            case (tag, handler) =>
-              if (err != null) handler.failure(new IllegalArgumentException(err.toString))
-              else result match {
-                case null => handler.success(null)
-                case tag(x) => handler.success(x)
-                case _ => handler.failure(new IllegalArgumentException("result type " + result.getClass + " is not expected type " + tag.runtimeClass))
-              }
-          }
-          this.pendingRequests.remove(id)
+    private final class Req[A](/*val id: Int,*/ pr: Promise[A], peer: Request[A]) {
+      def complete(v: Value): Unit =
+        try {
+          val resT = peer.decode(v)
+          pr.success(resT)
+        } catch {
+          case NonFatal(e) =>
+            pr.failure(e)
         }
 
-      case Notification(_, method, args) =>
-        ??? // this.notificationEvent.onNext(NotificationEvent(method, args))
+      def fail(message: String): Unit =
+        pr.failure(new Exception(message))
     }
+
+    // Create a thread to listen for any packets
+    new Thread {
+      private[this] val u = MessagePack.newUnpacker(in)
+
+      override def run(): Unit =
+        try {
+          while (true) {
+            if (u.hasNext) {
+              val sz  = u.unpackArrayHeader
+              val tpe = u.unpackInt
+              (tpe: @switch) match {
+                case PacketType.Request =>
+                  // [type, msgid, method, params]
+                  require (sz == 4)
+                  val msgId   = u.unpackInt
+                  val method  = u.unpackString
+                  val args    = u.unpackValue
+                  println(s"Request: $msgId, $method, $args")
+
+                case PacketType.Response =>
+                  // [type, msgid, error, result]
+                  require (sz == 4)
+                  val msgId = u.unpackInt
+                  val ok    = u.tryUnpackNil
+                  sync.synchronized {
+                    reqMap.remove(msgId) match {
+                      case Some(req) =>
+                        if (ok) {
+                          val res = u.unpackValue
+                          println(s"Response: $msgId, success - $res")
+                          req.complete(res)
+
+                        } else {
+                          val errV  = u.unpackValue
+                          val err   = errV match {
+                            case StringValue(s) => s
+                            case other          => other.toString
+                          }
+                          /*val res   =*/ u.unpackValue
+                          println(s"Response: $msgId, failure - $err")
+                          req.fail(err)
+                        }
+                      case None =>
+                        println(s"Ooops. No handler for request $msgId")
+                    }
+                  }
+
+                case PacketType.Notification =>
+                  // [type, method, params]
+                  require (sz == 3)
+                  val method  = u.unpackString
+                  val args    = u.unpackValue
+                  println(s"Notification: $method, $args")
+              }
+
+            } else {
+              Thread.sleep(4) // XXX TODO can we run asynchronously?
+            }
+          }
+        } catch {
+          case NonFatal(e) =>
+            e.printStackTrace()
+        }
+
+      start()
+    }
+
+    override def request[A](req: Request[A]): Future[A] =
+      sync.synchronized {
+        val id = nextReqId
+        nextReqId += 1
+
+        val pr = Promise[A]()
+        val rq = new Req(pr, req)
+        assert (reqMap.put(id, rq).isEmpty)
+
+        val p = MessagePack.newBufferPacker
+        p.packArrayHeader(4)
+        p.packInt(PacketType.Request)
+        p.packInt(id)
+        p.packString(req.method)
+        p.packValue(req.params)
+        out.write(p.toByteArray)
+        out.flush()
+
+        pr.future
+      }
+
+    override def notify(n: Notification): Unit =
+      sync.synchronized {
+//      val p = MessagePack.newPacker(out) -- N.B. seems broken
+        val p = MessagePack.newBufferPacker
+        p.packArrayHeader(3)
+        p.packInt(PacketType.Notification)
+        p.packString(n.method)
+        p.packValue(n.params)
+        out.write(p.toByteArray)
+        out.flush()
+      }
   }
 }
 trait Session {
-  def notify(api: API): Unit
+  def notify(n: Notification): Unit
+
+  def request[A](req: Request[A]): Future[A]
 }
