@@ -51,63 +51,58 @@ object Session {
       private[this] val u = MessagePack.newUnpacker(in)
 
       override def run(): Unit =
-        try {
-          while (true) {
-            if (u.hasNext) {
-              val sz  = u.unpackArrayHeader
-              val tpe = u.unpackInt
-              (tpe: @switch) match {
-                case PacketType.Request =>
-                  // [type, msgid, method, params]
-                  require (sz == 4)
-                  val msgId   = u.unpackInt
-                  val method  = u.unpackString
-                  val args    = u.unpackValue
-                  println(s"Request: $msgId, $method, $args")
+        while (u.hasNext) {
+          try {
+            val sz  = u.unpackArrayHeader
+            val tpe = u.unpackInt
+            (tpe: @switch) match {
+              case PacketType.Request =>
+                // [type, msgid, method, params]
+                require (sz == 4)
+                val msgId   = u.unpackInt
+                val method  = u.unpackString
+                val args    = u.unpackValue
+                println(s"Request: $msgId, $method, $args")
 
-                case PacketType.Response =>
-                  // [type, msgid, error, result]
-                  require (sz == 4)
-                  val msgId = u.unpackInt
-                  val ok    = u.tryUnpackNil
-                  sync.synchronized {
-                    reqMap.remove(msgId) match {
-                      case Some(req) =>
-                        if (ok) {
-                          val res = u.unpackValue
-                          println(s"Response: $msgId, success - $res")
-                          req.complete(res)
+              case PacketType.Response =>
+                // [type, msgid, error, result]
+                require (sz == 4)
+                val msgId = u.unpackInt
+                val ok    = u.tryUnpackNil
+                sync.synchronized {
+                  reqMap.remove(msgId) match {
+                    case Some(req) =>
+                      if (ok) {
+                        val res = u.unpackValue
+                        println(s"Response: $msgId, success - $res")
+                        req.complete(res)
 
-                        } else {
-                          val errV  = u.unpackValue
-                          val err   = errV match {
-                            case StringValue(s) => s
-                            case other          => other.toString
-                          }
-                          /*val res   =*/ u.unpackValue
-                          println(s"Response: $msgId, failure - $err")
-                          req.fail(err)
+                      } else {
+                        val errV  = u.unpackValue
+                        val err   = errV match {
+                          case StringValue(s) => s
+                          case other          => other.toString
                         }
-                      case None =>
-                        println(s"Ooops. No handler for request $msgId")
-                    }
+                        /*val res   =*/ u.unpackValue
+                        println(s"Response: $msgId, failure - $err")
+                        req.fail(err)
+                      }
+                    case None =>
+                      println(s"Ooops. No handler for request $msgId")
                   }
+                }
 
-                case PacketType.Notification =>
-                  // [type, method, params]
-                  require (sz == 3)
-                  val method  = u.unpackString
-                  val args    = u.unpackValue
-                  println(s"Notification: $method, $args")
-              }
-
-            } else {
-              Thread.sleep(4) // XXX TODO can we run asynchronously?
+              case PacketType.Notification =>
+                // [type, method, params]
+                require (sz == 3)
+                val method  = u.unpackString
+                val args    = u.unpackValue
+                println(s"Notification: $method, $args")
             }
+          } catch {
+            case NonFatal(e) =>
+              e.printStackTrace()
           }
-        } catch {
-          case NonFatal(e) =>
-            e.printStackTrace()
         }
 
       start()

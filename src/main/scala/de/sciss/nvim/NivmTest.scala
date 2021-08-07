@@ -24,6 +24,7 @@ object NivmTest {
 
 //    Thread.sleep(8000)
     val expr = "12 + 34"
+//    val expr = "12 + BLA"
     n.eval(expr).onComplete {
       case Success(s) =>
         println(s"nvim says $expr equals $s")
