@@ -51,6 +51,7 @@ object Test {
             contents = v.component
             pack().centerOnScreen()
             open()
+            v.component.requestFocus()
           }
         }
 

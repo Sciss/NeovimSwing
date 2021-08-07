@@ -76,6 +76,13 @@ final case class Put(lines: ISeq[String], tpe: String, after: Boolean, follow: B
       BooleanValue(after) +: BooleanValue(follow) +: Vector.empty)
 }
 
+final case class Input(keys: ISeq[String]) extends Notification {
+  def method: String = "nvim_input"
+
+  override def params: ArrayValue =
+    ArrayValue(keys.iterator.map(StringValue).toIndexedSeq)
+}
+
 object UI {
   sealed trait Option {
     def key   : String
@@ -90,6 +97,16 @@ object UI {
       ArrayValue(
         ValueFactory.newInteger(width) +:
         ValueFactory.newInteger(height) +: MapValue(optionsV) +: Vector.empty
+      )
+    }
+  }
+
+  case class TryResize(width: Int, height: Int) extends Notification {
+    override def method: String = "nvim_ui_try_resize"
+
+    override def params: ArrayValue = {
+      ArrayValue(
+        ValueFactory.newInteger(width) +: ValueFactory.newInteger(height) +: Vector.empty
       )
     }
   }
@@ -115,6 +132,8 @@ object UI {
       ModeChange,
       MouseOn,
       MouseOff,
+      SetScrollRegion,
+      Scroll,
       Flush,
       SetTitle,
     ) .iterator.map { f => (f.name, f) } .toMap
@@ -530,6 +549,38 @@ object UI {
       override def name: String = MouseOff.name
 
       override def param: Value = ValueFactory.newNil
+    }
+
+    object SetScrollRegion extends UpdateFactory {
+      final val name = "set_scroll_region"
+
+      override def decode(v: Vec[Value]): Update = v match {
+        case Seq(LongValue(top), LongValue(bot), LongValue(left), LongValue(right)) =>
+          SetScrollRegion(top = top.toInt, bot = bot.toInt, left = left.toInt, right = right.toInt)
+
+        case other => sys.error(other.toString)
+      }
+    }
+    case class SetScrollRegion(top: Int, bot: Int, left: Int, right: Int) extends Update {
+      override def name: String = SetScrollRegion.name
+
+      override def param: Value = ???
+    }
+
+    object Scroll extends UpdateFactory {
+      final val name = "scroll"
+
+      override def decode(v: Vec[Value]): Update = v match {
+        case Seq(LongValue(count)) =>
+          Scroll(count = count.toInt)
+
+        case other => sys.error(other.toString)
+      }
+    }
+    case class Scroll(count: Int) extends Update {
+      override def name: String = Scroll.name
+
+      override def param: Value = ???
     }
 
     object Flush extends UpdateFactory {
