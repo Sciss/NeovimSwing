@@ -15,9 +15,9 @@ package de.sciss.nvim
 
 import de.sciss.nvim.UI.Redraw.{HighlightSet, SetScrollRegion}
 
-import java.awt.{Cursor, RenderingHints}
 import java.awt.event.{ComponentAdapter, ComponentEvent, InputEvent, KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
 import java.awt.image.BufferedImage
+import java.awt.{Cursor, RenderingHints}
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.swing.{Color, Component, Dimension, Font, Graphics2D}
 
@@ -46,13 +46,16 @@ object View {
     private def resized(newRows: Int, newColumns: Int): Unit = {
       rows          = newRows
       columns       = newColumns
-      preferredSize = new Dimension(cellWidth * columns, cellHeight * rows)
+      val w         = cellWidth * columns
+      val h         = cellHeight * rows
+      initImage(w, h)
+      preferredSize = new Dimension(w, h)
     }
 
     resized(rows0, columns0)
 
     peer.addKeyListener(new KeyAdapter {
-      private var consumed = false
+//      private var consumed = false
 
       override def keyPressed(e: KeyEvent): Unit = {
         val mod     = e.getModifiersEx
@@ -150,11 +153,13 @@ object View {
         val newRows     = c.getHeight / cellHeight
         if (newColumns != columns || newRows != rows) {
           val p = UI.TryResize(width = newColumns, height = newRows)
-          // println(p)
+          println(p)
           nv ! p
         }
       }
 
+      override def componentHidden(e: ComponentEvent): Unit =
+        disposeImage()
     })
 
     opaque = true
@@ -171,18 +176,55 @@ object View {
     private var x = 0
     private var y = 0
 
-    override protected def paintComponent(g: Graphics2D): Unit = {
-//      super.paintComponent(g)
+    private var img : BufferedImage = null
+    private var imgG: Graphics2D    = null
 
+    override protected def paintComponent(g: Graphics2D): Unit = {
+      super.paintComponent(g)
+      g.setBackground(defaultBg)
+      g.clearRect(0, 0, peer.getWidth, peer.getHeight)
+      paintUpdates()
+      /*if (img != null)*/ g.drawImage(img, 0, 0, null)
+    }
+
+    private def initImage(width: Int, height: Int): Unit = {
+//      println(s"initImage($width, $height)")
+//      (new Exception).printStackTrace()
+      val imgNew = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
+      val g = imgNew.createGraphics()
       g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
       g.setColor      (fg)
       g.setBackground (bg)
+      g.clearRect(0, 0, width, height)
+      if (img != null) g.drawImage(img, 0, 0, null)
+      disposeImage()
+      img   = imgNew
+      imgG  = g
+    }
+
+    private def disposeImage(): Unit = {
+      if (imgG != null) {
+        imgG.dispose()
+        imgG = null
+        img  = null
+//        println(s"disposeImage()")
+//        (new Exception).printStackTrace()
+      }
+    }
+
+    private def paintUpdates(): Unit = {
+//      require (EventQueue.isDispatchThread)
+//      super.paintComponent(g)
+      if (imgG == null) initImage(peer.getWidth, peer.getHeight)
 
       val u = sync.synchronized {
         val res = updates
         updates = Vector.empty
         res
       }
+      if (u.isEmpty) return
+
+      val g = imgG
       g.setFont(fnt)
       val fm = g.getFontMetrics
       var reverse = false
@@ -272,8 +314,10 @@ object View {
           // }
 
         case ui @ UI.Redraw.Resize(newColumns, newRows) =>
-          // println(ui)
-          resized(newRows = newRows, newColumns = newColumns)
+          println(ui)
+          if (newColumns != columns || newRows != rows) {
+            resized(newRows = newRows, newColumns = newColumns)
+          }
 
         case UI.Redraw.WinViewport(grid: Int, _ /*win*/, topLine, botLine, curLine, curCol) =>
 
@@ -314,6 +358,9 @@ object View {
         sync.synchronized {
           updates ++= u
         }
+//        Swing.onEDT {
+//          paintUpdates()
+//        }
         repaint()
     }
     nv ! UI.Attach(width = columns, height = rows)
