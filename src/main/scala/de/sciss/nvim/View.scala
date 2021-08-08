@@ -13,13 +13,13 @@
 
 package de.sciss.nvim
 
-import de.sciss.nvim.Redraw.{HighlightSet, SetScrollRegion}
+import de.sciss.nvim.Redraw.{HighlightSet, ModeInfoSet, SetScrollRegion}
 
 import java.awt.event.{ComponentAdapter, ComponentEvent, InputEvent, KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
 import java.awt.image.BufferedImage
-import java.awt.{Cursor, RenderingHints}
+import java.awt.{Color, Cursor, RenderingHints}
 import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.swing.{Color, Component, Dimension, Font, Graphics2D}
+import scala.swing.{Component, Dimension, Font, Graphics2D}
 
 object View {
   def apply(nv: Neovim, rows: Int = 24, columns: Int = 60): View = {
@@ -42,6 +42,8 @@ object View {
     private val sync        = new AnyRef
     private var updates     = Vec.empty[Redraw.Update]
     private var scrollRegion = SetScrollRegion(0, 0, 0, 0)
+    private var modeName    = ""
+    private var modeMap     = Map.empty[String, ModeInfoSet.Info]
 
     private def resized(newRows: Int, newColumns: Int): Unit = {
       rows          = newRows
@@ -76,7 +78,6 @@ object View {
           case KeyEvent.VK_UP         => "Up"
           case KeyEvent.VK_RIGHT      => "Right"
           case KeyEvent.VK_DOWN       => "Down"
-          case KeyEvent.VK_LESS       => "Down"
           case KeyEvent.VK_DELETE     => "Del"
           case KeyEvent.VK_F1         => "F1"
           case KeyEvent.VK_F2         => "F2"
@@ -101,7 +102,10 @@ object View {
           case KeyEvent.VK_UNDEFINED  => ""
           case other                  =>
             val c = if (hasMod0) other.toChar else e.getKeyChar
-            s"_$c"
+            c match {
+              case '<'  => "lt"
+              case _    => s"_$c"
+            }
         }
         if (name0.isEmpty) return
 
@@ -117,6 +121,7 @@ object View {
             case KeyEvent.VK_PERIOD   => "Point"
             case KeyEvent.VK_COMMA    => "Comma"
             case KeyEvent.VK_EQUALS   => "Equal"
+            case KeyEvent.VK_INSERT   => "Insert"
             case other                =>
               val c = if (hasMod0) other.toChar else e.getKeyChar
               c.toString
@@ -128,7 +133,7 @@ object View {
         val name      = if (!hasMod0 && !isKP && !isSpecial) name2 else {
           val sb = new java.lang.StringBuilder
           sb.append('<')
-          if (e.isShiftDown & isSpecial) sb.append("S-")
+          if (e.isShiftDown && isSpecial && name2 != "lt") sb.append("S-")  // XXX TODO ugly special casing
           if (e.isControlDown ) sb.append("C-")
           if (e.isMetaDown    ) sb.append("M-")
           if (e.isAltDown     ) sb.append("A-")
@@ -169,7 +174,7 @@ object View {
 //        new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB), new java.awt.Point(0, 0), "hidden")
 
     private var defaultFg : Color = null
-    private var defaultBg : Color = null
+    private var defaultBg : Color = Color.black   // need an init because of XOR mode
     private var fg        : Color = null
     private var bg        : Color = null
 
@@ -179,12 +184,27 @@ object View {
     private var img : BufferedImage = null
     private var imgG: Graphics2D    = null
 
+    private val DefaultTextCursor = TextCursor(TextCursor.Vertical, 25)
+    private var textCursor        = DefaultTextCursor
+
     override protected def paintComponent(g: Graphics2D): Unit = {
       super.paintComponent(g)
       g.setBackground(defaultBg)
       g.clearRect(0, 0, peer.getWidth, peer.getHeight)
       paintUpdates()
       /*if (img != null)*/ g.drawImage(img, 0, 0, null)
+      g.setColor  (defaultFg) // XXX TODO: should use inverted colors of current cell
+      g.setXORMode(defaultBg)
+      textCursor.shape match {
+        case TextCursor.Block =>
+          g.fillRect(x, y, cellWidth, cellHeight)
+        case TextCursor.Horizontal =>
+          val e = 2 // textCursor.cellExtent(cellHeight)
+          g.fillRect(x, y + cellHeight - e, cellWidth, e)
+        case TextCursor.Vertical =>
+          val e = 1 // defaults look bad: textCursor.cellExtent(cellHeight)
+          g.fillRect(x, y, e, cellHeight)
+      }
     }
 
     private def initImage(width: Int, height: Int): Unit = {
@@ -288,9 +308,18 @@ object View {
 
         case Redraw.HlGroupSet(_, _) =>
 
-        case Redraw.ModeInfoSet(_, _) =>
+        case ui @ Redraw.ModeInfoSet(_, _) =>
+          modeMap = ui.asMap
 
-        case Redraw.ModeChange(_, _) =>
+        case /*ui @*/ Redraw.ModeChange(name, _) =>
+          if (modeName != name) {
+            modeName = name
+            modeMap.get(name) match {
+              case Some(info) =>
+                textCursor = info.cursor.getOrElse(DefaultTextCursor)
+              case _ =>
+            }
+          }
 
         case Redraw.DefaultColorsSet(rgbFg, rgbBg, _ /*rgbSp*/, _, _) =>
           defaultFg = new Color(rgbFg)
@@ -325,7 +354,8 @@ object View {
             g = imgG  // switch to new context
           }
 
-        case Redraw.WinViewport(grid: Int, _ /*win*/, topLine, botLine, curLine, curCol) =>
+        case /*ui @*/ Redraw.WinViewport(_, _, _, _, _, _) =>
+          // println(ui)
 
         case Redraw.UpdateFg(c) =>
           val col = new Color(c)

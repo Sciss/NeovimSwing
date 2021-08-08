@@ -16,12 +16,10 @@ absolutely no warranties. To contact the author, send an e-mail to `contact at s
 
 In 'alpha' state.
 
-- cursor not yet drawn
 - keyboard interaction half done. still problems with some special keys, linux compose key doesn't seem to work
 - playing around with [nvim-metals](https://github.com/scalameta/nvim-metals/); still need to isolate the build
   directory. you might need to run `:MetalsImportBuild` when opening a different sbt project, because metals relies
   on current working directory.
-- less-than `<` cannot be typed
 
 ## requirements / installation
 

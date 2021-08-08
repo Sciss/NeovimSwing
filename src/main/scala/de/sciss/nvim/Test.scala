@@ -53,11 +53,11 @@ object Test {
             pack().centerOnScreen()
             open()
             v.component.requestFocus()
-//            nv ! Command("e src/main/scala/de/sciss/nvim/ConcealTest.scala")
-            nv ! Command("e ConcealTest.scala")
-            nv ! Command("set conceallevel=3")
-            nv ! Command("set concealcursor=nvic")
-            nv ! Command("""syn region glueCode start="BEG_GLUE" end="END_GLUE" containedin=ALL conceal""")
+            nv ! Command("e src/main/scala/de/sciss/nvim/Neovim.scala")
+//            nv ! Command("e ConcealTest.scala")
+//            nv ! Command("set conceallevel=3")
+//            nv ! Command("set concealcursor=nvic")
+//            nv ! Command("""syn region glueCode start="/*BEG_GLUE" end="END_GLUE*/" containedin=ALL conceal cchar=}""")
           }
         }
 

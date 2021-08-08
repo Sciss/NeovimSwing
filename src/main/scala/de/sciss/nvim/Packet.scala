@@ -495,15 +495,38 @@ object Redraw extends NotificationFactory {
   object ModeInfoSet extends UpdateFactory {
     final val name = "mode_info_set"
 
+    case class Info(name: String, shortName: String, cursor: Option[TextCursor])
+
     override def decode(v: Seq[Value]): Update = v match {
-      case Seq(BooleanValue(cursorStyleEnabled), modeInfoV) =>
-        ModeInfoSet(cursorStyleEnabled = cursorStyleEnabled, modeInfo = modeInfoV)
+      case Seq(BooleanValue(cursorStyleEnabled), ArrayValue(infoSq)) =>
+        val modeInfo = infoSq.map {
+          case MapValue(entries) =>
+            val name      = entries(StringValue("name"      )).toString
+            val shortName = entries(StringValue("short_name")).toString
+            val cursorShape = entries.get(StringValue("cursor_shape")).collect {
+              case StringValue(TextCursor.Block      .name)  => TextCursor.Block
+              case StringValue(TextCursor.Horizontal .name)  => TextCursor.Horizontal
+              case StringValue(TextCursor.Vertical   .name)  => TextCursor.Vertical
+            }
+            val cursor = cursorShape.map { shape =>
+              val cellPer   = entries.get(StringValue("cell_percentage" )).fold(0) { case LongValue(v) => v.toInt }
+              val blinkWait = entries.get(StringValue("blinkwait"       )).fold(0) { case LongValue(v) => v.toInt }
+              val blinkOn   = entries.get(StringValue("blinkon"         )).fold(0) { case LongValue(v) => v.toInt }
+              val blinkOff  = entries.get(StringValue("blinkoff"        )).fold(0) { case LongValue(v) => v.toInt }
+              TextCursor(shape, cellPercentage = cellPer,
+                blinkWait = blinkWait, blinkOn = blinkOn, blinkOff = blinkOff)
+            }
+            Info(name = name, shortName = shortName, cursor = cursor)
+        }
+        ModeInfoSet(cursorStyleEnabled = cursorStyleEnabled, modeInfo = modeInfo)
 
       case other => sys.error(other.toString)
     }
   }
-  case class ModeInfoSet(cursorStyleEnabled: Boolean, modeInfo: Value) extends Update {
+  case class ModeInfoSet(cursorStyleEnabled: Boolean, modeInfo: ISeq[ModeInfoSet.Info]) extends Update {
     override def name: String = ModeInfoSet.name
+
+    def asMap: Map[String, ModeInfoSet.Info] = modeInfo.iterator.map { i => (i.name, i) } .toMap
 
     override def param: Value = ???
   }
