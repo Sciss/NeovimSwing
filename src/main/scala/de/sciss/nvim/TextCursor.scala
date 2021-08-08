@@ -1,6 +1,6 @@
 /*
  * TextCursor.scala
- * (Neovim UI Test)
+ * (NeovimSwing)
  *
  * Copyright (c) 2021 Hanns Holger Rutz. All rights reserved.
  *

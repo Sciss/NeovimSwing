@@ -1,13 +1,13 @@
-# Neovim UI Test
+# NeovimSwing
 
-[![Build Status](https://github.com/Sciss/NeovimUITest/workflows/Scala%20CI/badge.svg?branch=main)](https://github.com/Sciss/NeovimUITest/actions?query=workflow%3A%22Scala+CI%22)
+[![Build Status](https://github.com/Sciss/NeovimSwing/workflows/Scala%20CI/badge.svg?branch=main)](https://github.com/Sciss/NeovimSwing/actions?query=workflow%3A%22Scala+CI%22)
 
 ## statement
 
 Attempt at embedding Neovim in a Swing/Java2D UI written in Scala. Work in progress.
 This project is (C)opyright 2021
 by Hanns Holger Rutz. All rights reserved. This project is released under 
-the [GNU Lesser General Public License](https://github.com/Sciss/NeovimUITest/raw/main/LICENSE) v2.1+ and comes with
+the [GNU Lesser General Public License](https://github.com/Sciss/NeovimSwing/raw/main/LICENSE) v2.1+ and comes with
 absolutely no warranties. To contact the author, send an e-mail to `contact at sciss.de`.
 
 ![screenshot](screenshot.png)
@@ -17,9 +17,10 @@ absolutely no warranties. To contact the author, send an e-mail to `contact at s
 In 'alpha' state.
 
 - keyboard interaction half done. still problems with some special keys, linux compose key doesn't seem to work
-- playing around with [nvim-metals](https://github.com/scalameta/nvim-metals/); still need to isolate the build
-  directory. you might need to run `:MetalsImportBuild` when opening a different sbt project, because metals relies
-  on current working directory.
+- playing around with [nvim-metals](https://github.com/scalameta/nvim-metals/); run `:MetalsImportBuild` when opening 
+  an sbt project whose definitions changed.
+- mouse control not yet implemented
+- repaint should be more efficient (specify dirty rectangle)
 
 ## requirements / installation
 
@@ -27,7 +28,8 @@ This project builds with sbt against Scala 2.13.
 
 ## running
 
-Use `sbt run`. It assumes the `nvim` executable is on the `PATH`. Neovim 0.5.0 or higher is required.
+Use `sbt Test/run`. It assumes the `nvim` executable is on the `PATH`. Neovim 0.5.0 or higher is required.
+Use `sbt 'Test/run --help'` to see options.
 
 ## setting up nvim
 

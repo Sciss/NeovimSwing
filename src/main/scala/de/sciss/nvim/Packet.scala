@@ -1,6 +1,6 @@
 /* {{{
  * Packet.scala
- * (Neovim UI Test)
+ * (NeovimSwing)
  *
  * Copyright (c) 2021 Hanns Holger Rutz. All rights reserved.
  *
@@ -135,6 +135,8 @@ object Redraw extends NotificationFactory {
     MouseOff,
     SetScrollRegion,
     Scroll,
+    BusyStart,
+    BusyStop,
     Flush,
     SetTitle,
   ) .iterator.map { f => (f.name, f) } .toMap
@@ -499,7 +501,7 @@ object Redraw extends NotificationFactory {
 
     override def decode(v: Seq[Value]): Update = v match {
       case Seq(BooleanValue(cursorStyleEnabled), ArrayValue(infoSq)) =>
-        val modeInfo = infoSq.map {
+        val modeInfo = infoSq.iterator.map {
           case MapValue(entries) =>
             val name      = entries(StringValue("name"      )).toString
             val shortName = entries(StringValue("short_name")).toString
@@ -517,7 +519,7 @@ object Redraw extends NotificationFactory {
                 blinkWait = blinkWait, blinkOn = blinkOn, blinkOff = blinkOff)
             }
             Info(name = name, shortName = shortName, cursor = cursor)
-        }
+        } .toIndexedSeq
         ModeInfoSet(cursorStyleEnabled = cursorStyleEnabled, modeInfo = modeInfo)
 
       case other => sys.error(other.toString)
@@ -605,6 +607,34 @@ object Redraw extends NotificationFactory {
     override def name: String = Scroll.name
 
     override def param: Value = ???
+  }
+
+  object BusyStart extends UpdateFactory {
+    final val name = "busy_start"
+
+    override def decode(v: Seq[Value]): Update = v match {
+      case Seq() => BusyStart()
+      case other => sys.error(other.toString)
+    }
+  }
+  case class BusyStart() extends Update {
+    override def name: String = BusyStart.name
+
+    override def param: Value = ValueFactory.newNil
+  }
+
+  object BusyStop extends UpdateFactory {
+    final val name = "busy_stop"
+
+    override def decode(v: Seq[Value]): Update = v match {
+      case Seq() => BusyStop()
+      case other => sys.error(other.toString)
+    }
+  }
+  case class BusyStop() extends Update {
+    override def name: String = BusyStop.name
+
+    override def param: Value = ValueFactory.newNil
   }
 
   object Flush extends UpdateFactory {

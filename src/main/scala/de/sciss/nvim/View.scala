@@ -1,6 +1,6 @@
 /*
  * View.scala
- * (Neovim UI Test)
+ * (NeovimSwing)
  *
  * Copyright (c) 2021 Hanns Holger Rutz. All rights reserved.
  *
@@ -32,18 +32,51 @@ object View {
 
     private[this] val DEBUG = false
 
-    private var rows        = rows0
-    private var columns     = columns0
-    private val fnt         = Font(Font.Monospaced, Font.Plain, 14)
-    private val fntB        = fnt.deriveFont(Font.Bold.id)
-    private val fm          = peer.getFontMetrics(fnt)
-    private val cellWidth   = fm.getMaxAdvance
-    private val cellHeight  = fm.getHeight
-    private val sync        = new AnyRef
-    private var updates     = Vec.empty[Redraw.Update]
-    private var scrollRegion = SetScrollRegion(0, 0, 0, 0)
-    private var modeName    = ""
-    private var modeMap     = Map.empty[String, ModeInfoSet.Info]
+    private var rows          = rows0
+    private var columns       = columns0
+    private val fnt           = Font(Font.Monospaced, Font.Plain, 14)
+    private val fntBold       = fnt     .deriveFont(Font.Bold  .id)
+    private val fntItalic     = fnt     .deriveFont(Font.Italic.id)
+    private val fntBoldItalic = fntBold .deriveFont(Font.Italic.id)
+    private val fm            = peer.getFontMetrics(fnt)
+    private val cellWidth     = fm.getMaxAdvance
+    private val cellHeight    = fm.getHeight
+    private val sync          = new AnyRef
+    private var updates       = Vec.empty[Redraw.Update]
+    private var scrollRegion   = SetScrollRegion(0, 0, 0, 0)
+    private var modeName      = ""
+    private var modeMap       = Map.empty[String, ModeInfoSet.Info]
+
+
+    private var defaultFg : Color = null
+    private var defaultBg : Color = Color.black   // need an init because of XOR mode
+    private var defaultSp : Color = null
+    private var colFg     : Color = null
+    private var colBg     : Color = null
+    private var colSp     : Color = null
+
+    private var x = 0
+    private var y = 0
+
+    private var reverse   = false
+    private var underline = false
+    private var bold      = false
+    private var italic    = false
+    private var special   = false
+
+    private var img : BufferedImage = null
+    private var imgG: Graphics2D    = null
+
+    private val DefaultTextCursor = TextCursor(TextCursor.Vertical, 25)
+    private var textCursor        = DefaultTextCursor
+    private var textCursorVisible = true
+
+    private def updateFont(g: Graphics2D): Unit = g.setFont(
+      if      (bold && italic)  fntBoldItalic
+      else if (bold)            fntBold
+      else if (italic)          fntItalic
+      else                      fnt
+    )
 
     private def resized(newRows: Int, newColumns: Int): Unit = {
       rows          = newRows
@@ -173,37 +206,25 @@ object View {
 //      java.awt.Toolkit.getDefaultToolkit.createCustomCursor(
 //        new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB), new java.awt.Point(0, 0), "hidden")
 
-    private var defaultFg : Color = null
-    private var defaultBg : Color = Color.black   // need an init because of XOR mode
-    private var fg        : Color = null
-    private var bg        : Color = null
-
-    private var x = 0
-    private var y = 0
-
-    private var img : BufferedImage = null
-    private var imgG: Graphics2D    = null
-
-    private val DefaultTextCursor = TextCursor(TextCursor.Vertical, 25)
-    private var textCursor        = DefaultTextCursor
-
     override protected def paintComponent(g: Graphics2D): Unit = {
       super.paintComponent(g)
       g.setBackground(defaultBg)
       g.clearRect(0, 0, peer.getWidth, peer.getHeight)
       paintUpdates()
       /*if (img != null)*/ g.drawImage(img, 0, 0, null)
-      g.setColor  (defaultFg) // XXX TODO: should use inverted colors of current cell
-      g.setXORMode(defaultBg)
-      textCursor.shape match {
-        case TextCursor.Block =>
-          g.fillRect(x, y, cellWidth, cellHeight)
-        case TextCursor.Horizontal =>
-          val e = 2 // textCursor.cellExtent(cellHeight)
-          g.fillRect(x, y + cellHeight - e, cellWidth, e)
-        case TextCursor.Vertical =>
-          val e = 1 // defaults look bad: textCursor.cellExtent(cellHeight)
-          g.fillRect(x, y, e, cellHeight)
+      if (textCursorVisible) {
+        g.setColor(defaultFg) // XXX TODO: should use inverted colors of current cell
+        textCursor.shape match {
+          case TextCursor.Block =>
+            g.setXORMode(defaultBg)
+            g.fillRect(x, y, cellWidth, cellHeight)
+          case TextCursor.Horizontal =>
+            val e = 2 // textCursor.cellExtent(cellHeight)
+            g.fillRect(x, y + cellHeight - e, cellWidth, e)
+          case TextCursor.Vertical =>
+            val e = 2 // defaults look bad: textCursor.cellExtent(cellHeight)
+            g.fillRect(x, y, e, cellHeight)
+        }
       }
     }
 
@@ -213,8 +234,9 @@ object View {
       val imgNew = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
       val g = imgNew.createGraphics()
       g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-      g.setColor      (fg)
-      g.setBackground (bg)
+      g.setColor      (colFg)
+      g.setBackground (colBg)
+      updateFont(g)
       g.clearRect(0, 0, width, height)
       if (img != null) {
         g.drawImage(img, 0, 0, null)
@@ -249,9 +271,9 @@ object View {
 
       var g = imgG
       // println(s"${u.size} updates for ${g.hashCode().toHexString}")
-      g.setFont(fnt)
+      // g.setFont(fnt)
       val fm = g.getFontMetrics
-      var reverse = false
+
       u.foreach {
         case Redraw.CursorGoto(row, col) =>
           x = col * cellWidth
@@ -259,38 +281,51 @@ object View {
 
         case Redraw.Put(text) =>
           // println(s"Put(${text})")
-          val w = text.length * cellWidth
+          val w   = text.length * cellWidth
+          val col = g.getColor
+          val ya  = y + fm.getAscent
           if (reverse) {
-            val col = g.getColor
             g.fillRect(x, y, w, cellHeight)
             g.setColor(g.getBackground)
-            g.drawString(text, x, y + fm.getAscent)
-            g.setColor(col)
           } else {
             g.clearRect(x, y, w, cellHeight)
-            g.drawString(text, x, y + fm.getAscent)
           }
+          g.drawString(text, x, ya)
+          if (underline) {
+            g.drawLine(x, ya + 1, x + w - 1, ya + 1)
+          }
+          if (reverse) g.setColor(col)
           x += w
 
         case Redraw.HighlightSet(attr) =>
-          g.setFont(fnt)
-          fg = defaultFg
-          bg = defaultBg
-          g.setBackground(bg)
-          g.setColor(fg)
-          reverse = false
+          colFg     = defaultFg
+          colBg     = defaultBg
+          colSp     = defaultSp
+          underline = false
+          bold      = false
+          italic    = false
+          reverse   = false
+          special   = false
+          g.setBackground (colBg)
+          g.setColor      (colFg)
+          updateFont(g)
           attr.foreach {
             case HighlightSet.Bold() =>
-              g.setFont(fntB)
+              bold = true
+              updateFont(g)
+
+            case HighlightSet.Italic() =>
+              italic = true
+              updateFont(g)
 
             case HighlightSet.Foreground(c) =>
               val col = new Color(c)
-              fg = col
+              colFg = col
               g.setColor(col)
 
             case HighlightSet.Background(c) =>
               val col = new Color(c)
-              bg = col
+              colBg = col
               g.setBackground(col)
 
             case HighlightSet.Reverse() =>
@@ -299,6 +334,15 @@ object View {
 //              val fg = g.getColor
 //              g.setBackground(fg)
 //              g.setColor(bg)
+
+            case HighlightSet.Underline() =>
+              underline = true
+
+            case HighlightSet.Special(c) =>
+              val col = new Color(c)
+              colSp     = col
+              special   = true
+              g.setColor(col)
 
             case other =>
               println(s"IGNORE ATTR $other")
@@ -321,7 +365,7 @@ object View {
             }
           }
 
-        case Redraw.DefaultColorsSet(rgbFg, rgbBg, _ /*rgbSp*/, _, _) =>
+        case Redraw.DefaultColorsSet(rgbFg, rgbBg, rgbSp, _, _) =>
           defaultFg = new Color(rgbFg)
           defaultBg = new Color(rgbBg)
 
@@ -332,6 +376,12 @@ object View {
 
         case Redraw.MouseOff() =>
           cursor = Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR) // HiddenCursor
+
+        case Redraw.BusyStart() =>
+          textCursorVisible = false
+
+        case Redraw.BusyStop() =>
+          textCursorVisible = true
 
         case Redraw.Clear() =>
           // if (reverse) {
@@ -359,13 +409,13 @@ object View {
 
         case Redraw.UpdateFg(c) =>
           val col = new Color(c)
-          fg = col
+          colFg = col
           // defaultFg = col
           g.setColor(col)
 
         case Redraw.UpdateBg(c) =>
           val col = new Color(c)
-          bg = col
+          colBg = col
           // defaultBg = col
           g.setBackground(col)
 

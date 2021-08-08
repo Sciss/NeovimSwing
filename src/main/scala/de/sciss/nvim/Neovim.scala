@@ -1,6 +1,6 @@
 /*
  * Neovim.scala
- * (Neovim UI Test)
+ * (NeovimSwing)
  *
  * Copyright (c) 2021 Hanns Holger Rutz. All rights reserved.
  *
@@ -16,18 +16,69 @@ package de.sciss.nvim
 import de.sciss.model.Model
 import de.sciss.model.Model.Listener
 
-import java.io.{InputStream, OutputStream}
+import java.io.{File, InputStream, OutputStream}
 import java.util.concurrent.TimeUnit
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import scala.sys.process.{Process, ProcessIO}
 
 object Neovim {
-  def apply(in: InputStream, out: OutputStream): Neovim = {
+  case class Config(
+                     program  : String        = "nvim",
+                     cwd      : File          = new File(""),
+                     open     : Option[File]  = None,
+                     rows     : Int           = 24,
+                     columns  : Int           = 60,
+                     initVim  : Boolean       = true,
+                     swap     : Boolean       = true,
+                     readOnly : Boolean       = false,
+                     editable : Boolean       = true,
+                     writable : Boolean       = true,
+                   )
+
+  def start(config: Config): Neovim.Started = {
+    import config._
+    var in  : InputStream   = null
+    var out : OutputStream  = null
+
+    val cmdB = Seq.newBuilder[String]
+    cmdB += program
+    cmdB += "--embed"
+    if (!initVim  ) cmdB ++= "-u" :: "NONE" :: Nil
+    if (!swap     ) cmdB += "-n"
+    if (readOnly  ) cmdB += "-R"
+    if (!editable ) cmdB += "-M"
+    if (!writable ) cmdB += "-m"
+    val cmd   = cmdB.result
+    // println(cmd)
+    val pb    = Process(cmd, cwd = cwd)
+    val pio = new ProcessIO(
+      _out  => out = _out,
+      _in   => in = _in,
+      _ => ()
+    )
+    val p = pb.run(pio)
     val session = Session(in, out)
-    new Impl(session)
+    new StartedImpl(p, session)
   }
 
-  private final class Impl(session: Session) extends Neovim {
+  def connect(p: Option[Process], in: InputStream, out: OutputStream): Neovim = {
+    val session = Session(in, out)
+    new Impl(p, session)
+  }
+
+  private final class Impl(val processOption: Option[Process], protected val session: Session)
+    extends Base
+
+  private final class StartedImpl(val process: Process, protected val session: Session)
+    extends Base with Started {
+
+    override def processOption: Option[Process] = Some(process)
+  }
+
+  private abstract class Base extends Neovim {
+    protected def session: Session
+
     override def quit(): Unit = this ! Command("qa!")
 
     override def eval(s: String): Future[String] = this !! Eval(s)
@@ -39,13 +90,22 @@ object Neovim {
     override def addListener    (pf: Listener[Packet]): pf.type = session.addListener   (pf)
     override def removeListener (pf: Listener[Packet]): Unit    = session.removeListener(pf)
   }
+
+  trait Started extends Neovim {
+    def process: Process
+  }
 }
 trait Neovim extends Model[Packet] {
+  /** Corresponding shell process, if it was started from the JVM */
+  def processOption: Option[Process]
+
   def quit(): Unit
 
   def eval(s: String): Future[String]
 
+  /** Sends a notification to nvim without waiting for a response */
   def ! (n: Notification): Unit
 
+  /** Sends a request to nvim, returning a future of the response */
   def !! [A](req: Request[A], timeout: Duration = Duration(6, TimeUnit.SECONDS)): Future[A]
 }
