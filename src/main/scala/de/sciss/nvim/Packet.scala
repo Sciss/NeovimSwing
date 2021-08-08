@@ -1,4 +1,4 @@
-/*
+/* {{{
  * Packet.scala
  * (Neovim UI Test)
  *
@@ -8,7 +8,7 @@
  *
  *
  * For further information, please contact Hanns Holger Rutz at
- * contact@sciss.de
+ * contact@sciss.de }}}
  */
 
 package de.sciss.nvim

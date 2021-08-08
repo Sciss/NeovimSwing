@@ -21,6 +21,7 @@ In 'alpha' state.
 - playing around with [nvim-metals](https://github.com/scalameta/nvim-metals/); still need to isolate the build
   directory. you might need to run `:MetalsImportBuild` when opening a different sbt project, because metals relies
   on current working directory.
+- less-than `<` cannot be typed
 
 ## requirements / installation
 
@@ -69,3 +70,9 @@ Scala projects communicating with nvim:
 
 - [neovim-scala](https://github.com/fuyumatsuri/neovim-scala) - old project (2016), comes with its own
   [msgpack library](https://github.com/fuyumatsuri/msgpack-rpc-scala)
+
+Concealing wrapper code:
+
+- https://www.reddit.com/r/neovim/comments/nc49bw/conceal_all_html_tags/
+- https://vi.stackexchange.com/questions/5533/hide-certain-lines-completely-not-folding
+- https://vi.stackexchange.com/questions/5175/is-there-a-way-to-conceal-across-lines

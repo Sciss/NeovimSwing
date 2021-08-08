@@ -42,6 +42,7 @@ object Test {
     nv.eval(expr).onComplete {
       case Success(s) =>
         println(s"nvim says $expr equals $s")
+//        nv ! Command("set foldmethod=marker")
 //        n.quit()
         // nv ! Put("Hello world." :: Nil, "c", after = false, follow = true)
         Swing.onEDT {
@@ -52,6 +53,11 @@ object Test {
             pack().centerOnScreen()
             open()
             v.component.requestFocus()
+//            nv ! Command("e src/main/scala/de/sciss/nvim/ConcealTest.scala")
+            nv ! Command("e ConcealTest.scala")
+            nv ! Command("set conceallevel=3")
+            nv ! Command("set concealcursor=nvic")
+            nv ! Command("""syn region glueCode start="BEG_GLUE" end="END_GLUE" containedin=ALL conceal""")
           }
         }
 
