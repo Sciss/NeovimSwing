@@ -26,7 +26,7 @@ object Test {
     var is: InputStream   = null
     var os: OutputStream  = null
 
-    val pb = Process(Seq("nvim", /*"-u", "NONE",*/ "-n", "--embed"))
+    val pb = Process(Seq("nvim", /*"-u", "NONE",*/ /*"-n",*/ "--embed"))
     val pio = new ProcessIO(
       out  => os = out,
       in   => is = in,

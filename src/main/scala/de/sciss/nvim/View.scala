@@ -13,7 +13,7 @@
 
 package de.sciss.nvim
 
-import de.sciss.nvim.UI.Redraw.{HighlightSet, SetScrollRegion}
+import de.sciss.nvim.Redraw.{HighlightSet, SetScrollRegion}
 
 import java.awt.event.{ComponentAdapter, ComponentEvent, InputEvent, KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
 import java.awt.image.BufferedImage
@@ -40,7 +40,7 @@ object View {
     private val cellWidth   = fm.getMaxAdvance
     private val cellHeight  = fm.getHeight
     private val sync        = new AnyRef
-    private var updates     = Vec.empty[UI.Redraw.Update]
+    private var updates     = Vec.empty[Redraw.Update]
     private var scrollRegion = SetScrollRegion(0, 0, 0, 0)
 
     private def resized(newRows: Int, newColumns: Int): Unit = {
@@ -153,7 +153,7 @@ object View {
         val newRows     = c.getHeight / cellHeight
         if (newColumns != columns || newRows != rows) {
           val p = UI.TryResize(width = newColumns, height = newRows)
-          println(p)
+          // println(p)
           nv ! p
         }
       }
@@ -164,9 +164,9 @@ object View {
 
     opaque = true
 
-    private lazy val HiddenCursor: java.awt.Cursor =
-      java.awt.Toolkit.getDefaultToolkit.createCustomCursor(
-        new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB), new java.awt.Point(0, 0), "hidden")
+//    private val HiddenCursor: java.awt.Cursor =
+//      java.awt.Toolkit.getDefaultToolkit.createCustomCursor(
+//        new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB), new java.awt.Point(0, 0), "hidden")
 
     private var defaultFg : Color = null
     private var defaultBg : Color = null
@@ -196,15 +196,18 @@ object View {
       g.setColor      (fg)
       g.setBackground (bg)
       g.clearRect(0, 0, width, height)
-      if (img != null) g.drawImage(img, 0, 0, null)
+      if (img != null) {
+        g.drawImage(img, 0, 0, null)
+      }
       disposeImage()
       img   = imgNew
       imgG  = g
+      // println(s"new g is ${g.hashCode().toHexString}")
     }
 
     private def disposeImage(): Unit = {
       if (imgG != null) {
-        imgG.dispose()
+//        imgG.dispose()
         imgG = null
         img  = null
 //        println(s"disposeImage()")
@@ -224,16 +227,18 @@ object View {
       }
       if (u.isEmpty) return
 
-      val g = imgG
+      var g = imgG
+      // println(s"${u.size} updates for ${g.hashCode().toHexString}")
       g.setFont(fnt)
       val fm = g.getFontMetrics
       var reverse = false
       u.foreach {
-        case UI.Redraw.CursorGoto(row, col) =>
+        case Redraw.CursorGoto(row, col) =>
           x = col * cellWidth
           y = row * cellHeight
 
-        case UI.Redraw.Put(text) =>
+        case Redraw.Put(text) =>
+          // println(s"Put(${text})")
           val w = text.length * cellWidth
           if (reverse) {
             val col = g.getColor
@@ -247,7 +252,7 @@ object View {
           }
           x += w
 
-        case UI.Redraw.HighlightSet(attr) =>
+        case Redraw.HighlightSet(attr) =>
           g.setFont(fnt)
           fg = defaultFg
           bg = defaultBg
@@ -279,67 +284,69 @@ object View {
               println(s"IGNORE ATTR $other")
           }
 
-        case UI.Redraw.OptionSet(_, _) =>
+        case Redraw.OptionSet(_, _) =>
 
-        case UI.Redraw.HlGroupSet(_, _) =>
+        case Redraw.HlGroupSet(_, _) =>
 
-        case UI.Redraw.ModeInfoSet(_, _) =>
+        case Redraw.ModeInfoSet(_, _) =>
 
-        case UI.Redraw.ModeChange(_, _) =>
+        case Redraw.ModeChange(_, _) =>
 
-        case UI.Redraw.DefaultColorsSet(rgbFg, rgbBg, _ /*rgbSp*/, _, _) =>
+        case Redraw.DefaultColorsSet(rgbFg, rgbBg, _ /*rgbSp*/, _, _) =>
           defaultFg = new Color(rgbFg)
           defaultBg = new Color(rgbBg)
 
-        case UI.Redraw.Flush() =>
+        case Redraw.Flush() =>
 
-        case UI.Redraw.MouseOn() =>
+        case Redraw.MouseOn() =>
           cursor = null
 
-        case UI.Redraw.MouseOff() =>
+        case Redraw.MouseOff() =>
           cursor = Cursor.getPredefinedCursor(Cursor.TEXT_CURSOR) // HiddenCursor
 
-        case UI.Redraw.Clear() =>
+        case Redraw.Clear() =>
           // if (reverse) {
           //   g.fillRect (0, 0, peer.getWidth, peer.getHeight)
           // } else {
             g.clearRect(0, 0, peer.getWidth, peer.getHeight)
           // }
 
-        case UI.Redraw.EolClear() =>
+        case Redraw.EolClear() =>
           // if (reverse) {
           //   g.fillRect (x, y, peer.getWidth - x, cellHeight)
           // } else {
             g.clearRect(x, y, peer.getWidth - x, cellHeight)
           // }
 
-        case ui @ UI.Redraw.Resize(newColumns, newRows) =>
-          println(ui)
+        case /*ui @*/ Redraw.Resize(newColumns, newRows) =>
+//          println(ui)
           if (newColumns != columns || newRows != rows) {
             resized(newRows = newRows, newColumns = newColumns)
+            g = imgG  // switch to new context
           }
 
-        case UI.Redraw.WinViewport(grid: Int, _ /*win*/, topLine, botLine, curLine, curCol) =>
+        case Redraw.WinViewport(grid: Int, _ /*win*/, topLine, botLine, curLine, curCol) =>
 
-        case UI.Redraw.UpdateFg(c) =>
+        case Redraw.UpdateFg(c) =>
           val col = new Color(c)
           fg = col
           // defaultFg = col
           g.setColor(col)
 
-        case UI.Redraw.UpdateBg(c) =>
+        case Redraw.UpdateBg(c) =>
           val col = new Color(c)
           bg = col
           // defaultBg = col
           g.setBackground(col)
 
-        case UI.Redraw.UpdateSp(_) =>
+        case Redraw.UpdateSp(_) =>
 
-        case sr: UI.Redraw.SetScrollRegion =>
+        case sr: Redraw.SetScrollRegion =>
           scrollRegion = sr
 
-        case UI.Redraw.Scroll(count) =>
+        case Redraw.Scroll(count) =>
           val sr = scrollRegion
+          // println(s"scroll $count in $sr")
           g.copyArea(
             sr.left * cellWidth,
             (sr.top + count)  * cellHeight,
@@ -354,7 +361,8 @@ object View {
     }
 
     nv.addListener {
-      case UI.Redraw(u) =>
+      case Redraw(u) =>
+        // println(s"${u.size} updates")
         sync.synchronized {
           updates ++= u
         }

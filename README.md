@@ -4,9 +4,9 @@
 
 ## statement
 
-Some tests for embedding Neovim in a Swing/Java2D UI written in Scala. Work in progress.
+Attempt at embedding Neovim in a Swing/Java2D UI written in Scala. Work in progress.
 This project is (C)opyright 2021
-by Hanns Holger Rutz. All rights reserved. ScalaOSC is released under 
+by Hanns Holger Rutz. All rights reserved. This project is released under 
 the [GNU Lesser General Public License](https://github.com/Sciss/NeovimUITest/raw/main/LICENSE) v2.1+ and comes with
 absolutely no warranties. To contact the author, send an e-mail to `contact at sciss.de`.
 
@@ -14,7 +14,13 @@ absolutely no warranties. To contact the author, send an e-mail to `contact at s
 
 ## status
 
-In 'alpha' state. Redraw working, but no keyboard interaction yet.
+In 'alpha' state.
+
+- cursor not yet drawn
+- keyboard interaction half done. still problems with some special keys, linux compose key doesn't seem to work
+- playing around with [nvim-metals](https://github.com/scalameta/nvim-metals/); still need to isolate the build
+  directory. you might need to run `:MetalsImportBuild` when opening a different sbt project, because metals relies
+  on current working directory.
 
 ## requirements / installation
 
