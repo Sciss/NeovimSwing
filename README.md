@@ -1,10 +1,11 @@
 # NeovimSwing
 
 [![Build Status](https://github.com/Sciss/NeovimSwing/workflows/Scala%20CI/badge.svg?branch=main)](https://github.com/Sciss/NeovimSwing/actions?query=workflow%3A%22Scala+CI%22)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/de.sciss/neovim-swing_2.13/badge.svg)](https://maven-badges.herokuapp.com/maven-central/de.sciss/neovim-swing_2.13)
 
 ## statement
 
-Attempt at embedding Neovim in a Swing/Java2D UI written in Scala. Work in progress.
+A library to embed Neovim in a Swing/Java2D UI, written in Scala. Work in progress.
 This project is (C)opyright 2021
 by Hanns Holger Rutz. All rights reserved. This project is released under 
 the [GNU Lesser General Public License](https://github.com/Sciss/NeovimSwing/raw/main/LICENSE) v2.1+ and comes with
@@ -24,16 +25,27 @@ In 'alpha' state.
 
 ## requirements / installation
 
-This project builds with sbt against Scala 2.13.
-
-## running
+This project builds with sbt against Scala 2.12, 2.13, 3 (JVM).
 
 Use `sbt Test/run`. It assumes the `nvim` executable is on the `PATH`. Neovim 0.5.0 or higher is required.
 Use `sbt 'Test/run --help'` to see options.
 
+## linking
+
+The following artifacts are available:
+
+    "de.sciss" %% "neovim-swing" % v
+
+The current version `v` is `"0.1.0"`.
+
+## contributing
+
+Please see the file [CONTRIBUTING.md](CONTRIBUTING.md)
+
 ## setting up nvim
 
-clone the repo and `git checkout -b stable stable` to select nvim 0.5.0. Build via
+clone the [repo](https://github.com/neovim/neovim/) and `git checkout -b stable stable` to select nvim 0.5.0.
+Build via
 
     sudo apt install ninja-build gettext libtool libtool-bin autoconf automake g++ pkg-config unzip curl
     make distclean
@@ -51,7 +63,7 @@ use as `~/.config/nvim/init.lua`: https://github.com/scalameta/nvim-metals/discu
 
 after first start of nvim, update packer plugins via `:PackerSync`.
 
-## useful stuff
+## useful stuff (notes)
 
 nvim uses [msgpack](https://msgpack.org/) to format its communication in remote procedure calls (RPC).
 [msgpack-rpc spec](https://github.com/msgpack-rpc/msgpack-rpc/blob/master/spec.md).
