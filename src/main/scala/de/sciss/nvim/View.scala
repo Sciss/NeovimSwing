@@ -22,25 +22,35 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.swing.{Component, Dimension, Font, Graphics2D}
 
 object View {
-  def apply(nv: Neovim, rows: Int = 24, columns: Int = 60): View = {
+  case class Config(
+                     rows       : Int      = 40,
+                     columns    : Int     = 100,
+                     fontFamily : String  = Font.Monospaced,
+                     fontSize   : Float   = 16f,
+                     lineSpacing: Int     = 105,
+                   ) {
     require (rows > 0 && columns > 0)
-    new Impl(nv, rows0 = rows, columns0 = columns)
   }
 
-  private final class Impl(nv: Neovim, rows0: Int, columns0: Int) extends Component with View {
+  def apply(nv: Neovim, config: Config = Config()): View = {
+    new Impl(nv, config)
+  }
+
+  private final class Impl(nv: Neovim, config: Config) extends Component with View {
     override def component: Component = this
 
     private[this] val DEBUG = false
 
-    private var rows          = rows0
-    private var columns       = columns0
-    private val fnt           = Font(Font.Monospaced, Font.Plain, 14)
+    private var rows          = 0
+    private var columns       = 0
+    private val fnt           = Font(config.fontFamily, Font.Plain, 1).deriveFont(config.fontSize)
     private val fntBold       = fnt     .deriveFont(Font.Bold  .id)
     private val fntItalic     = fnt     .deriveFont(Font.Italic.id)
     private val fntBoldItalic = fntBold .deriveFont(Font.Italic.id)
     private val fm            = peer.getFontMetrics(fnt)
     private val cellWidth     = fm.getMaxAdvance
-    private val cellHeight    = fm.getHeight
+    private val blockHeight   = fm.getHeight
+    private val cellHeight    = math.max(1, blockHeight * config.lineSpacing / 100)
     private val sync          = new AnyRef
     private var updates       = Vec.empty[Redraw.Update]
     private var scrollRegion   = SetScrollRegion(0, 0, 0, 0)
@@ -87,7 +97,7 @@ object View {
       preferredSize = new Dimension(w, h)
     }
 
-    resized(rows0, columns0)
+    resized(newRows = config.rows, newColumns = config.columns)
 
     peer.addKeyListener(new KeyAdapter {
 //      private var consumed = false
@@ -217,13 +227,13 @@ object View {
         textCursor.shape match {
           case TextCursor.Block =>
             g.setXORMode(defaultBg)
-            g.fillRect(x, y, cellWidth, cellHeight)
+            g.fillRect(x, y, cellWidth, blockHeight)
           case TextCursor.Horizontal =>
             val e = 2 // textCursor.cellExtent(cellHeight)
-            g.fillRect(x, y + cellHeight - e, cellWidth, e)
+            g.fillRect(x, y + blockHeight - e, cellWidth, e)
           case TextCursor.Vertical =>
             val e = 2 // defaults look bad: textCursor.cellExtent(cellHeight)
-            g.fillRect(x, y, e, cellHeight)
+            g.fillRect(x, y, e, blockHeight)
         }
       }
     }
@@ -368,6 +378,7 @@ object View {
         case Redraw.DefaultColorsSet(rgbFg, rgbBg, rgbSp, _, _) =>
           defaultFg = new Color(rgbFg)
           defaultBg = new Color(rgbBg)
+          defaultSp = new Color(rgbSp)
 
         case Redraw.Flush() =>
 

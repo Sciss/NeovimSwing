@@ -26,6 +26,7 @@ lazy val root = project.withId(baseNameL).in(file("."))
     licenses            := Seq("LGPL v2.1+" -> url("http://www.gnu.org/licenses/lgpl-2.1.txt")),
     scalaVersion        := "2.13.6",
     crossScalaVersions  := Seq("3.0.1", "2.13.6", "2.12.14"),
+    scalacOptions      ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8"),
     libraryDependencies ++= Seq(
       "de.sciss"                %% "model"            % deps.main.model,          // message dispatch
       "org.scala-lang.modules"  %% "scala-swing"      % deps.main.swing,          // UI

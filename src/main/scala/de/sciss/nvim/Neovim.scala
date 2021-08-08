@@ -24,19 +24,18 @@ import scala.sys.process.{Process, ProcessIO}
 
 object Neovim {
   case class Config(
-                     program  : String        = "nvim",
-                     cwd      : File          = new File(""),
-                     open     : Option[File]  = None,
-                     rows     : Int           = 24,
-                     columns  : Int           = 60,
-                     initVim  : Boolean       = true,
-                     swap     : Boolean       = true,
-                     readOnly : Boolean       = false,
-                     editable : Boolean       = true,
-                     writable : Boolean       = true,
+                     program    : String        = "nvim",
+                     cwd        : File          = new File(""),
+                     open       : Option[File]  = None,
+                     initVim    : Boolean       = true,
+                     customInit : Option[File]  = None,
+                     swap       : Boolean       = true,
+                     readOnly   : Boolean       = false,
+                     editable   : Boolean       = true,
+                     writable   : Boolean       = true,
                    )
 
-  def start(config: Config): Neovim.Started = {
+  def start(config: Config = Config()): Neovim.Started = {
     import config._
     var in  : InputStream   = null
     var out : OutputStream  = null
@@ -44,12 +43,13 @@ object Neovim {
     val cmdB = Seq.newBuilder[String]
     cmdB += program
     cmdB += "--embed"
-    if (!initVim  ) cmdB ++= "-u" :: "NONE" :: Nil
+    val initPath = if (!initVim) Some("NONE") else customInit.map(_.getPath)
+    initPath.foreach { path => cmdB ++= "-u" :: path :: Nil }
     if (!swap     ) cmdB += "-n"
     if (readOnly  ) cmdB += "-R"
     if (!editable ) cmdB += "-M"
     if (!writable ) cmdB += "-m"
-    val cmd   = cmdB.result
+    val cmd   = cmdB.result()
     // println(cmd)
     val pb    = Process(cmd, cwd = cwd)
     val pio = new ProcessIO(
@@ -59,7 +59,9 @@ object Neovim {
     )
     val p = pb.run(pio)
     val session = Session(in, out)
-    new StartedImpl(p, session)
+    val nv = new StartedImpl(p, session)
+    open.foreach { fIn => nv ! Command(s"""e $fIn""") }
+    nv
   }
 
   def connect(p: Option[Process], in: InputStream, out: OutputStream): Neovim = {
