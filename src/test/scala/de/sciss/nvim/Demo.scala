@@ -50,9 +50,9 @@ object Demo {
         descr = s"font size  (default: ${defaultView.fontSize})",
         validate = _ > 0f,
       )
-      val lineSpacing: Opt[Int] = opt(default = Some(defaultView.lineSpacing),
-        descr = s"line spacing in percent (default: ${defaultView.lineSpacing})",
-        validate = _ > 0,
+      val lineSpacing: Opt[Float] = opt(default = Some(defaultView.lineSpacing),
+        descr = s"line spacing factor (default: ${defaultView.lineSpacing})",
+        validate = _ > 0.01f,
       )
       val noInit: Opt[Boolean] = toggle(default = Some(!defaultNv.initVim),
         descrYes = "do not use standard init.vim",
@@ -104,7 +104,6 @@ object Demo {
         contents = v.component
         pack().centerOnScreen()
         open()
-        v.component.requestFocus()
 //        cNv.open.foreach { fIn => nv ! Command(s"""e $fIn""") } // XXX TODO: escape path
       }
     }

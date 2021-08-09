@@ -15,19 +15,21 @@ package de.sciss.nvim
 
 import de.sciss.nvim.Redraw.{HighlightSet, ModeInfoSet, SetScrollRegion}
 
-import java.awt.event.{ComponentAdapter, ComponentEvent, InputEvent, KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
+import java.awt.event.{ComponentAdapter, ComponentEvent, FocusEvent, FocusListener, InputEvent, KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
 import java.awt.image.BufferedImage
 import java.awt.{Color, Cursor, RenderingHints}
+import javax.swing.event.{AncestorEvent, AncestorListener}
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.swing.{Component, Dimension, Font, Graphics2D}
 
 object View {
   case class Config(
-                     rows       : Int      = 40,
-                     columns    : Int     = 100,
-                     fontFamily : String  = Font.Monospaced,
-                     fontSize   : Float   = 16f,
-                     lineSpacing: Int     = 105,
+                     rows         : Int     = 40,
+                     columns      : Int     = 100,
+                     fontFamily   : String  = Font.Monospaced,
+                     fontSize     : Float   = 16f,
+                     lineSpacing  : Float   = 1.05f,
+                     initialFocus : Boolean = true,
                    ) {
     require (rows > 0 && columns > 0)
   }
@@ -50,13 +52,12 @@ object View {
     private val fm            = peer.getFontMetrics(fnt)
     private val cellWidth     = fm.getMaxAdvance
     private val blockHeight   = fm.getHeight
-    private val cellHeight    = math.max(1, blockHeight * config.lineSpacing / 100)
+    private val cellHeight    = math.max(1, (blockHeight * config.lineSpacing + 0.5f).toInt)
     private val sync          = new AnyRef
     private var updates       = Vec.empty[Redraw.Update]
     private var scrollRegion   = SetScrollRegion(0, 0, 0, 0)
     private var modeName      = ""
     private var modeMap       = Map.empty[String, ModeInfoSet.Info]
-
 
     private var defaultFg : Color = null
     private var defaultBg : Color = Color.black   // need an init because of XOR mode
@@ -95,6 +96,29 @@ object View {
       val h         = cellHeight * rows
       initImage(w, h)
       preferredSize = new Dimension(w, h)
+    }
+
+    private var attached = false
+
+    private def attach(): Unit = {
+      if (!attached) {
+        attached = true
+        nv ! UI.Attach(width = columns, height = rows)
+      }
+    }
+
+    private def detach(): Unit = {
+      if (attached) {
+        attached = false
+        // XXX TODO -- why does this not exist?
+        // nv ! UI.Detach()
+      }
+    }
+
+    def dispose(): Unit = {
+      detach()
+      disposeImage()
+      sync.synchronized { updates = Vector.empty }
     }
 
     resized(newRows = config.rows, newColumns = config.columns)
@@ -206,8 +230,30 @@ object View {
         }
       }
 
-      override def componentHidden(e: ComponentEvent): Unit =
-        disposeImage()
+//      override def componentHidden(e: ComponentEvent): Unit =
+//        disposeImage()
+    })
+
+    peer.addAncestorListener(new AncestorListener {
+      // private var first = true
+
+      def ancestorAdded(e: AncestorEvent): Unit = {
+        if (config.initialFocus) requestFocusInWindow()
+        attach()
+      }
+
+      def ancestorMoved   (e: AncestorEvent): Unit = ()
+      def ancestorRemoved (e: AncestorEvent): Unit = disposeImage()
+    })
+
+    peer.addFocusListener(new FocusListener {
+      private def check(): Unit =
+        if (textCursor.shape == TextCursor.Block) {
+          peer.repaint(x, y, cellWidth, cellHeight)
+        }
+
+      override def focusGained(e: FocusEvent): Unit = check()
+      override def focusLost  (e: FocusEvent): Unit = check()
     })
 
     opaque = true
@@ -226,8 +272,12 @@ object View {
         g.setColor(defaultFg) // XXX TODO: should use inverted colors of current cell
         textCursor.shape match {
           case TextCursor.Block =>
-            g.setXORMode(defaultBg)
-            g.fillRect(x, y, cellWidth, blockHeight)
+            if (hasFocus) {
+              g.setXORMode(defaultBg)
+              g.fillRect(x, y, cellWidth, blockHeight)
+            } else {
+              g.drawRect(x, y, cellWidth - 1, blockHeight - 1)
+            }
           case TextCursor.Horizontal =>
             val e = 2 // textCursor.cellExtent(cellHeight)
             g.fillRect(x, y + blockHeight - e, cellWidth, e)
@@ -452,7 +502,7 @@ object View {
     }
 
     nv.addListener {
-      case Redraw(u) =>
+      case Redraw(u) if attached =>
         // println(s"${u.size} updates")
         sync.synchronized {
           updates ++= u
@@ -462,9 +512,12 @@ object View {
 //        }
         repaint()
     }
-    nv ! UI.Attach(width = columns, height = rows)
+
+    attach()
   }
 }
 trait View {
   def component: Component
+
+  def dispose(): Unit
 }

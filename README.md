@@ -22,6 +22,7 @@ In 'alpha' state.
   an sbt project whose definitions changed.
 - mouse control not yet implemented
 - repaint should be more efficient (specify dirty rectangle)
+- minimum supported API is directly encoded, in the future should be auto-generated from `--api-info`
 
 ## requirements / installation
 
@@ -78,13 +79,24 @@ msgpack libraries for Scala:
    scodec 1.x instead of 2.x !
 - [msgpack4s](https://github.com/velvia/msgpack4s) - unclear if still maintained
   
-Scala projects communicating with nvim:
+Scala projects communicating or integrating with nvim:
 
 - [neovim-scala](https://github.com/fuyumatsuri/neovim-scala) - old project (2016), comes with its own
   [msgpack library](https://github.com/fuyumatsuri/msgpack-rpc-scala)
+- [nvimhost-scala](https://github.com/viniarck/nvimhost-scala) - write plug-ins in Scala
+
+JVM projects:
+
+- [javafx-neovimpane](https://github.com/jebberjeb/javafx-neovimpane) - using Clojure and JavaFX embedding (2018)
 
 Concealing wrapper code:
 
 - https://www.reddit.com/r/neovim/comments/nc49bw/conceal_all_html_tags/
 - https://vi.stackexchange.com/questions/5533/hide-certain-lines-completely-not-folding
 - https://vi.stackexchange.com/questions/5175/is-there-a-way-to-conceal-across-lines
+
+Creating debug logs: https://scalameta.org/metals/docs/contributors/getting-started/#json-rpc-trace
+
+    # Linux
+    touch ~/.cache/metals/lsp.trace.json # text editor
+    touch ~/.cache/metals/bsp.trace.json # build server
