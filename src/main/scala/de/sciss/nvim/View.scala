@@ -15,9 +15,10 @@ package de.sciss.nvim
 
 import de.sciss.nvim.Redraw.{HighlightSet, ModeInfoSet, SetScrollRegion}
 
+import java.awt.datatransfer.DataFlavor
 import java.awt.event.{ComponentAdapter, ComponentEvent, FocusEvent, FocusListener, InputEvent, KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
 import java.awt.image.BufferedImage
-import java.awt.{Color, Cursor, RenderingHints}
+import java.awt.{Color, Cursor, RenderingHints, Toolkit}
 import javax.swing.event.{AncestorEvent, AncestorListener}
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.swing.{Component, Dimension, Font, Graphics2D}
@@ -209,7 +210,18 @@ object View {
           sb.toString
         }
         if (DEBUG) println(s"TYPED: $name")
-        nv ! Input(name :: Nil)
+        // XXX TODO dirty hack to have some form of clipboard paste
+        if (name != "<C-V>") {
+          nv ! Input(name)
+        } else {
+          val cb      = Toolkit.getDefaultToolkit.getSystemClipboard
+          val fl      = DataFlavor.stringFlavor
+          val hasClip = cb.isDataFlavorAvailable(fl)
+          if (hasClip) {
+            val data = cb.getData(fl).toString
+            nv ! Paste(data)
+          }
+        }
       }
     })
 

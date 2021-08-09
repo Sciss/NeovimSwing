@@ -76,11 +76,18 @@ final case class Put(lines: ISeq[String], tpe: String, after: Boolean, follow: B
       BooleanValue(after) +: BooleanValue(follow) +: Vector.empty)
 }
 
-final case class Input(keys: ISeq[String]) extends Notification {
+final case class Input(keys: String) extends Notification {
   def method: String = "nvim_input"
 
   override def params: ArrayValue =
-    ArrayValue(keys.iterator.map(StringValue.apply).toIndexedSeq)
+    ArrayValue(StringValue(keys) +: Vector.empty)
+}
+
+final case class Paste(data: String, crLf: Boolean = true, phase: Int = -1) extends Notification {
+  def method: String = "nvim_paste"
+
+  override def params: ArrayValue =
+    ArrayValue(StringValue(data) +: BooleanValue(crLf) +:  LongValue(phase) +: Vector.empty)
 }
 
 object UI {
