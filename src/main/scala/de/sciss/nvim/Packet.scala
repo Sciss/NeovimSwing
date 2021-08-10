@@ -108,6 +108,12 @@ object UI {
     }
   }
 
+  case class Detach() extends Notification {
+    override def method: String = "nvim_ui_detach"
+
+    override def params: ArrayValue = ArrayValue(Vector.empty)
+  }
+
   case class TryResize(width: Int, height: Int) extends Notification {
     override def method: String = "nvim_ui_try_resize"
 

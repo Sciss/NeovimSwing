@@ -111,8 +111,7 @@ object View {
     private def detach(): Unit = {
       if (attached) {
         attached = false
-        // XXX TODO -- why does this not exist?
-        // nv ! UI.Detach()
+        nv ! UI.Detach()
       }
     }
 
