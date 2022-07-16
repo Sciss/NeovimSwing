@@ -10,9 +10,9 @@ ThisBuild / organization := "de.sciss"
 
 lazy val deps = new {
   val main = new {
-    val airframe  = "21.8.0"
+    val airframe  = "22.7.2"
     val model     = "0.3.5"
-    val scallop   = "4.0.3"
+    val scallop   = "4.1.0"
     val swing     = "3.0.0"
   }
 }
@@ -24,8 +24,8 @@ lazy val root = project.withId(baseNameL).in(file("."))
     description         := "Embedding Neovim in a Swing/Java2D user interface",
     homepage            := Some(url(s"https://$gitRepoHost/$gitRepoUser/$baseName")),
     licenses            := Seq("LGPL v2.1+" -> url("http://www.gnu.org/licenses/lgpl-2.1.txt")),
-    scalaVersion        := "2.13.6",
-    crossScalaVersions  := Seq("3.0.1", "2.13.6", "2.12.14"),
+    scalaVersion        := "2.13.8",
+    crossScalaVersions  := Seq("3.1.3", "2.13.8", "2.12.14"),
     scalacOptions      ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8"),
     libraryDependencies ++= Seq(
       "de.sciss"                %% "model"            % deps.main.model,          // message dispatch

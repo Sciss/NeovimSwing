@@ -6,7 +6,7 @@
 ## statement
 
 A library to embed Neovim in a Swing/Java2D UI, written in Scala. Work in progress.
-This project is (C)opyright 2021
+This project is (C)opyright 2021-2022
 by Hanns Holger Rutz. All rights reserved. This project is released under 
 the [GNU Lesser General Public License](https://github.com/Sciss/NeovimSwing/raw/main/LICENSE) v2.1+ and comes with
 absolutely no warranties. To contact the author, send an e-mail to `contact at sciss.de`.
@@ -45,15 +45,15 @@ Please see the file [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## setting up nvim
 
-clone the [repo](https://github.com/neovim/neovim/) and `git checkout -b stable stable` to select nvim 0.5.0.
+clone the [repo](https://github.com/neovim/neovim/) and `git checkout -b stable stable` to select nvim 0.5.0 or
+newer (as of this writing: 0.7.2).
+
 Build via
 
-    sudo apt install ninja-build gettext libtool libtool-bin autoconf automake g++ pkg-config unzip curl
+    sudo apt install ninja-build gettext libtool libtool-bin autoconf automake cmake g++ pkg-config unzip curl doxygen
     make distclean
     make CMAKE_BUILD_TYPE=Release -j4
     sudo make install
-
-(usually also install `cmake`, but Debian's might be too old)
 
 nvim-metals: install 'packer':
 

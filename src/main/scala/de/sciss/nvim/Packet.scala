@@ -2,7 +2,7 @@
  * Packet.scala
  * (NeovimSwing)
  *
- * Copyright (c) 2021 Hanns Holger Rutz. All rights reserved.
+ * Copyright (c) 2021-2022 Hanns Holger Rutz. All rights reserved.
  *
  * This software is published under the GNU Lesser General Public License v2.1+
  *
@@ -332,7 +332,8 @@ object Redraw extends NotificationFactory {
 
     override def decode(v: Seq[Value]): Update = v match {
       // cf. https://github.com/wvlet/airframe/issues/1774
-      case Seq(LongValue(grid), winV, LongValue(topLine), LongValue(botLine), LongValue(curLine), LongValue(curCol)) =>
+      // N.B. seems a seventh argument 'lineCount' was added at some point between nvim 0.5 and 0.7
+      case Seq(LongValue(grid), winV, LongValue(topLine), LongValue(botLine), LongValue(curLine), LongValue(curCol), _ @ _* /* LongValue(lineCount) */) =>
         WinViewport(grid = grid.toInt, win = winV, topLine = topLine.toInt, botLine = botLine.toInt,
           curLine = curLine.toInt, curCol = curCol.toInt)
 
