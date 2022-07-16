@@ -88,6 +88,7 @@ Scala projects communicating or integrating with nvim:
 JVM projects:
 
 - [javafx-neovimpane](https://github.com/jebberjeb/javafx-neovimpane) - using Clojure and JavaFX embedding (2018)
+- [neovim-java](https://codeberg.org/neovim-java/neovim-java) - haven't checked it out yet
 
 Concealing wrapper code:
 
